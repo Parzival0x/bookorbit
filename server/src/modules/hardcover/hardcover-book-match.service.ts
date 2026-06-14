@@ -253,7 +253,13 @@ export class HardcoverBookMatchService {
     }
   }
 
-  private async matchByTitleAuthor(userId: number, token: string, title: string, author: string, bookSync: BookSyncData): Promise<HardcoverBookMatch | null> {
+  private async matchByTitleAuthor(
+    userId: number,
+    token: string,
+    title: string,
+    author: string,
+    bookSync: BookSyncData,
+  ): Promise<HardcoverBookMatch | null> {
     try {
       const searchData = await this.client.query<SearchBooksResult>(userId, token, SEARCH_BOOKS_QUERY, {
         query: `${title} ${author}`,
@@ -274,7 +280,9 @@ export class HardcoverBookMatchService {
       };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      this.logger.warn(`[hardcover.book_match] [fail] userId=${userId} bookId=${bookSync.bookId} method=title_author error="${error}" - title lookup failed`);
+      this.logger.warn(
+        `[hardcover.book_match] [fail] userId=${userId} bookId=${bookSync.bookId} method=title_author error="${error}" - title lookup failed`,
+      );
       return null;
     }
   }
@@ -298,7 +306,7 @@ export class HardcoverBookMatchService {
       const editions = hardcoverBook.editions ?? [];
       const cachedEdition = cachedEditionId != null ? editions.find((edition) => edition.id === cachedEditionId) : undefined;
       const cachedEditionPages = this.normalizeEditionPages(cachedEdition?.pages);
-      
+
       return { hardcoverEditionId: cachedEditionId, editionPages: cachedEditionPages };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));

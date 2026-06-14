@@ -13,56 +13,60 @@ const props = defineProps<{
 
 const router = useRouter()
 
-const readableFiles = computed(() => {
-  const normalized = props.book.files.filter((file) => {
+const fileInfo = computed(() => {
+  const readable = props.book.files.filter((file) => {
     const format = file.format?.trim().toLowerCase()
     return format ? READER_OPENABLE_FORMATS.has(format) : false
   })
-  const primary = normalized.find((file) => file.role === 'primary')
-  return primary ? [primary, ...normalized.filter((file) => file.id !== primary.id)] : normalized
-})
+  const prim = readable.find((file) => file.role === 'primary')
+  const readableFiles = prim ? [prim, ...readable.filter((file) => file.id !== prim.id)] : readable
 
-const isMultiTrackAudio = computed(() => {
-  const audioFiles = readableFiles.value.filter((file) => {
+  const audioFiles = readableFiles.filter((file) => {
     const format = file.format?.toLowerCase()
     return format ? FORMAT_TO_GROUP[format] === 'audio' : false
   })
-  return audioFiles.length > 1
-})
+  const isMultiTrackAudio = audioFiles.length > 1
 
-const openableFiles = computed<BookFileRef[]>(() => {
-  const collapsed = isMultiTrackAudio.value
+  const collapsed = isMultiTrackAudio
     ? (() => {
-        const firstAudio = readableFiles.value.find((file) => {
+        const firstAudio = readableFiles.find((file) => {
           const format = file.format?.toLowerCase()
           return format ? FORMAT_TO_GROUP[format] === 'audio' : false
         })
-        const nonAudio = readableFiles.value.filter((file) => {
+        const nonAudio = readableFiles.filter((file) => {
           const format = file.format?.toLowerCase()
           return format ? FORMAT_TO_GROUP[format] !== 'audio' : false
         })
         return firstAudio ? [firstAudio, ...nonAudio] : nonAudio
       })()
-    : readableFiles.value
+    : readableFiles
 
   const seen = new Set<string>()
-  return collapsed.filter((file) => {
+  const openableFiles = collapsed.filter((file) => {
     const key = file.format!.trim().toLowerCase()
     if (seen.has(key)) return false
     seen.add(key)
     return true
   })
+
+  const primaryFile = openableFiles.find((file) => file.role === 'primary') ?? openableFiles[0] ?? null
+
+  const primaryFormat = primaryFile?.format?.toLowerCase()
+  const primaryIsAudio = primaryFormat ? FORMAT_TO_GROUP[primaryFormat] === 'audio' : false
+
+  const canOpen = props.book.status !== 'missing' && !!primaryFile
+  const hasMultipleFormats = openableFiles.length > 1
+
+  return {
+    readableFiles,
+    isMultiTrackAudio,
+    openableFiles,
+    primaryFile,
+    primaryIsAudio,
+    canOpen,
+    hasMultipleFormats,
+  }
 })
-
-const primaryFile = computed(() => openableFiles.value.find((file) => file.role === 'primary') ?? openableFiles.value[0] ?? null)
-
-const primaryIsAudio = computed(() => {
-  const format = primaryFile.value?.format?.toLowerCase()
-  return format ? FORMAT_TO_GROUP[format] === 'audio' : false
-})
-
-const canOpen = computed(() => props.book.status !== 'missing' && !!primaryFile.value)
-const hasMultipleFormats = computed(() => openableFiles.value.length > 1)
 
 function actionVerb(file: BookFileRef | null): string {
   const format = file?.format?.toLowerCase()
@@ -97,25 +101,25 @@ function openFile(file: BookFileRef | null, mode?: 'peek') {
 }
 
 function openPrimaryFile() {
-  openFile(primaryFile.value)
+  openFile(fileInfo.value.primaryFile)
 }
 
 function peekPrimaryFile() {
-  openFile(primaryFile.value, 'peek')
+  openFile(fileInfo.value.primaryFile, 'peek')
 }
 </script>
 
 <template>
-  <div v-if="canOpen" class="flex w-full items-center justify-start">
-    <div v-if="hasMultipleFormats" class="mr-auto flex h-7 items-center overflow-hidden rounded-md">
+  <div v-if="fileInfo.canOpen" class="flex w-full items-center justify-start">
+    <div v-if="fileInfo.hasMultipleFormats" class="mr-auto flex h-7 items-center overflow-hidden rounded-md">
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
+        :aria-label="`${actionVerb(fileInfo.primaryFile)} ${formatLabel(fileInfo.primaryFile)}`"
+        :title="`${actionVerb(fileInfo.primaryFile)} ${formatLabel(fileInfo.primaryFile)}`"
         @click.stop="openPrimaryFile"
       >
-        <Play v-if="primaryIsAudio" :size="13" class="text-sky-500" />
+        <Play v-if="fileInfo.primaryIsAudio" :size="13" class="text-sky-500" />
         <BookOpen v-else :size="13" class="text-emerald-500" />
       </button>
       <div class="w-px shrink-0 bg-border/80" />
@@ -131,7 +135,7 @@ function peekPrimaryFile() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-48">
-          <DropdownMenuItem v-for="file in openableFiles" :key="file.id" class="gap-2" @select="openFile(file)">
+          <DropdownMenuItem v-for="file in fileInfo.openableFiles" :key="file.id" class="gap-2" @select="openFile(file)">
             <span
               class="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
               :style="formatBadgeStyle(file.format?.toLowerCase() ?? '?')"
@@ -139,9 +143,9 @@ function peekPrimaryFile() {
               {{ file.format }}
             </span>
             <span class="flex-1 truncate text-xs">{{ actionVerb(file) }} {{ formatLabel(file) }}</span>
-            <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">Primary</span>
+            <span v-if="file.role === 'primary' && !fileInfo.isMultiTrackAudio" class="text-[10px] text-primary">Primary</span>
           </DropdownMenuItem>
-          <DropdownMenuItem v-for="file in openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="openFile(file, 'peek')">
+          <DropdownMenuItem v-for="file in fileInfo.openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="openFile(file, 'peek')">
             <Eye :size="13" class="text-primary" />
             <span class="flex-1 truncate text-xs">Peek {{ formatLabel(file) }}</span>
           </DropdownMenuItem>
@@ -153,19 +157,19 @@ function peekPrimaryFile() {
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
+        :aria-label="`${actionVerb(fileInfo.primaryFile)} ${formatLabel(fileInfo.primaryFile)}`"
+        :title="`${actionVerb(fileInfo.primaryFile)} ${formatLabel(fileInfo.primaryFile)}`"
         @click.stop="openPrimaryFile"
       >
-        <Play v-if="isAudioFile(primaryFile)" :size="13" class="text-sky-500" />
+        <Play v-if="isAudioFile(fileInfo.primaryFile)" :size="13" class="text-sky-500" />
         <BookOpen v-else :size="13" class="text-emerald-500" />
       </button>
       <div class="w-px shrink-0 bg-border/80" />
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`Peek ${formatLabel(primaryFile)}`"
-        :title="`Peek ${formatLabel(primaryFile)}`"
+        :aria-label="`Peek ${formatLabel(fileInfo.primaryFile)}`"
+        :title="`Peek ${formatLabel(fileInfo.primaryFile)}`"
         @click.stop="peekPrimaryFile"
       >
         <Eye :size="13" class="text-primary" />

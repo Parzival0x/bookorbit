@@ -6,7 +6,7 @@ import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { HardcoverClient } from './hardcover.client';
 import { mapBestEditionForBook, mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
-import { HardcoverBookWithEditions, HardcoverSearchDocument } from './hardcover.types';
+import { HardcoverSearchDocument } from './hardcover.types';
 import { normalizeIsbn } from '../../../../common/utils/isbn-normalize.utils';
 
 @Injectable()
@@ -22,24 +22,29 @@ export class HardcoverProvider implements IdentifiableProvider {
     private readonly providerConfig: ProviderConfigService,
   ) {}
 
-  private async processSearchDocs(docs: HardcoverSearchDocument[], apiKey: string, params: MetadataSearchParams, signal?: AbortSignal): Promise<MetadataCandidate[]> {
+  private async processSearchDocs(
+    docs: HardcoverSearchDocument[],
+    apiKey: string,
+    params: MetadataSearchParams,
+    signal?: AbortSignal,
+  ): Promise<MetadataCandidate[]> {
     if (docs.length === 0) return [];
-    
+
     const topDocs = docs.slice(0, 3);
     const books = await Promise.all(
-      topDocs.map(doc => signal ? this.client.lookupBySlug(doc.slug, apiKey, signal) : this.client.lookupBySlug(doc.slug, apiKey))
+      topDocs.map((doc) => (signal ? this.client.lookupBySlug(doc.slug, apiKey, signal) : this.client.lookupBySlug(doc.slug, apiKey))),
     );
-    
+
     const candidates = books
       .filter((b) => b !== null)
-      .map(book => mapBestEditionForBook(book, params))
+      .map((book) => mapBestEditionForBook(book, params))
       .filter((c): c is MetadataCandidate => c !== null);
-      
+
     if (candidates.length > 0) {
       return candidates;
     }
-    
-    return docs.map(doc => {
+
+    return docs.map((doc) => {
       const candidate = mapSearchDocument(doc);
       // ISBNs from search documents are aggregated across all editions and may not
       // correspond to the user's specific edition. Remove them to avoid mismatches.
@@ -81,7 +86,6 @@ export class HardcoverProvider implements IdentifiableProvider {
     return this.processSearchDocs(docs, apiKey, params, signal);
   }
 
-
   async lookupById(providerId: string, signal?: AbortSignal, params?: MetadataSearchParams): Promise<MetadataCandidate | null> {
     const { enabled, apiKey } = await this.providerConfig.getConfig().then((c) => c.hardcover);
     if (!enabled || !apiKey) return null;
@@ -92,7 +96,7 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (params) {
       return mapBestEditionForBook(book, params);
     }
-    
+
     // Fallback if no params
     return mapBookWithEditions(book)[0] ?? null;
   }
