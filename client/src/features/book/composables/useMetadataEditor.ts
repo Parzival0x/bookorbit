@@ -51,6 +51,10 @@ const AUDIO_FIELDS = {
   abridged: 'abridged',
 } as const
 
+function normalizePageCount(value: number | null): number | null {
+  return typeof value === 'number' && value > 0 ? value : null
+}
+
 export function useMetadataEditor() {
   const saving = ref(false)
   const error = ref<string | null>(null)
@@ -161,8 +165,9 @@ export function useMetadataEditor() {
     const payload: Record<string, unknown> = {}
 
     for (const field of ROOT_FIELDS) {
-      if (JSON.stringify(form[field]) !== JSON.stringify(previous[field])) {
-        payload[field] = form[field]
+      const current = field === 'pageCount' ? normalizePageCount(form.pageCount) : form[field]
+      if (JSON.stringify(current) !== JSON.stringify(previous[field])) {
+        payload[field] = current
       }
     }
 
@@ -197,20 +202,16 @@ export function useMetadataEditor() {
     return { book: data, write: null, libraryAutoWriteEnabled: false }
   }
 
-  async function save(
-    bookId: number,
-    options: { lockedFields?: readonly BookMetadataLockField[]; saveLocks?: boolean } = {},
-  ): Promise<BookMetadataSaveResult | null> {
+  async function save(bookId: number, lockedFields: readonly BookMetadataLockField[]): Promise<BookMetadataSaveResult | null> {
     saving.value = true
     error.value = null
     try {
       const metadata = buildPayload()
-      const path = options.saveLocks ? `/api/v1/books/${bookId}/metadata-and-locks` : `/api/v1/books/${bookId}/metadata`
       const shouldSyncFileWrite = Object.keys(metadata).length > 0
-      const res = await api(`${path}${shouldSyncFileWrite ? '?syncFileWrite=true' : ''}`, {
+      const res = await api(`/api/v1/books/${bookId}/metadata-and-locks${shouldSyncFileWrite ? '?syncFileWrite=true' : ''}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(options.saveLocks ? { metadata, lockedFields: options.lockedFields ?? [] } : metadata),
+        body: JSON.stringify({ metadata, lockedFields }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated = normalizeSaveResult((await res.json()) as BookDetail | BookMetadataSaveResult)
