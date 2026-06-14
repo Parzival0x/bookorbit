@@ -233,9 +233,10 @@ export class HardcoverBookMatchService {
   }
 
   private async matchByIsbn(userId: number, token: string, isbn: string, bookId: number, version: 10 | 13): Promise<HardcoverBookMatch | null> {
+    const cleanIsbn = isbn.replace(/[^0-9X]/gi, '');
     const query = version === 13 ? FIND_BOOK_BY_ISBN13_QUERY : FIND_BOOK_BY_ISBN10_QUERY;
     try {
-      const data = await this.client.query<BooksQueryResult>(userId, token, query, { isbn });
+      const data = await this.client.query<BooksQueryResult>(userId, token, query, { isbn: cleanIsbn });
       const book = data.books?.[0];
       if (!book) return null;
       return {
@@ -314,12 +315,14 @@ export class HardcoverBookMatchService {
     if (!editions || editions.length === 0) return { hardcoverEditionId: null, editionPages: null };
 
     if (book.isbn13) {
-      const match = editions.find((e) => e.isbn_13 === book.isbn13);
+      const targetIsbn = book.isbn13.replace(/[^0-9X]/gi, '');
+      const match = editions.find((e) => e.isbn_13?.replace(/[^0-9X]/gi, '') === targetIsbn);
       if (match) return { hardcoverEditionId: match.id, editionPages: this.normalizeEditionPages(match.pages) };
     }
 
     if (book.isbn10) {
-      const match = editions.find((e) => e.isbn_10 === book.isbn10);
+      const targetIsbn = book.isbn10.replace(/[^0-9X]/gi, '');
+      const match = editions.find((e) => e.isbn_10?.replace(/[^0-9X]/gi, '') === targetIsbn);
       if (match) return { hardcoverEditionId: match.id, editionPages: this.normalizeEditionPages(match.pages) };
     }
 
