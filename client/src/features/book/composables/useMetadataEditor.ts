@@ -166,7 +166,8 @@ export function useMetadataEditor() {
 
     for (const field of ROOT_FIELDS) {
       const current = field === 'pageCount' ? normalizePageCount(form.pageCount) : form[field]
-      if (JSON.stringify(current) !== JSON.stringify(previous[field])) {
+      const prev = field === 'pageCount' ? normalizePageCount(previous.pageCount) : previous[field]
+      if (JSON.stringify(current) !== JSON.stringify(prev)) {
         payload[field] = current
       }
     }
