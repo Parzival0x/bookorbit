@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { MetadataProviderKey } from '@bookorbit/types';
 
@@ -12,8 +12,10 @@ export class LookupMetadataDto {
   id: string;
 
   @IsOptional()
+  @IsBoolean()
   isAudiobook?: boolean;
 
   @IsOptional()
+  @IsNumber()
   pageCount?: number;
 }
