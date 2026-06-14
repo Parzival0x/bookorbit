@@ -26,10 +26,15 @@ export interface ParsedOpf {
   lubimyczytacId: string | null;
   itunesId: string | null;
   coverHref: string | null;
+}
+
+export interface OpfStructure {
   spine: string[];
   manifest: Record<string, string>;
   guide: Record<string, string>;
 }
+
+export interface ParsedOpfResult extends ParsedOpf, OpfStructure {}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -173,7 +178,7 @@ function getRefineValue(refines: Map<string, unknown[]>, id: string, property: s
   return null;
 }
 
-export function parseOpf(xml: string): ParsedOpf {
+export function parseOpf(xml: string): ParsedOpfResult {
   const root = parser.parse(xml) as Record<string, unknown>;
   const pkg = (root['package'] ?? root['opf:package'] ?? {}) as Record<string, unknown>;
   const metadata = (pkg['metadata'] ?? pkg['opf:metadata'] ?? {}) as Record<string, unknown>;
