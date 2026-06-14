@@ -269,7 +269,7 @@ function formatBadgeStyle(fmt: string) {
           placeholder="Search all books..."
           class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
-        <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground">
+        <button v-if="globalSearchQuery" @click="clearSearch()" aria-label="Clear search" class="absolute right-2 text-muted-foreground hover:text-foreground">
           <X :size="13" />
         </button>
 
@@ -369,6 +369,7 @@ function formatBadgeStyle(fmt: string) {
           <button
             v-if="globalSearchQuery"
             @click="clearSearch()"
+            aria-label="Clear search"
             class="flex items-center justify-center text-muted-foreground/75 hover:text-foreground transition-colors"
           >
             <X :size="13" />
