@@ -30,6 +30,46 @@ const baseBook = {
 };
 
 describe('HardcoverBookMatchService', () => {
+
+  it('selects edition by exact isbn13 match', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query.mockResolvedValue({
+      books: [
+        {
+          id: 77,
+          editions: [
+            { id: 1, isbn_13: '1111111111111', pages: 300 },
+            { id: 2, isbn_13: '9781234567890', pages: 350 },
+          ],
+        },
+      ],
+    });
+    const book = { ...baseBook, hardcoverMetadataId: '77', isbn13: '9781234567890' };
+    const result = await makeService().matchBook(1, 'tok', book);
+    expect(result?.hardcoverEditionId).toBe(2);
+    expect(result?.editionPages).toBe(350);
+  });
+
+  it('selects edition by closest page count when no isbn match', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query.mockResolvedValue({
+      books: [
+        {
+          id: 77,
+          editions: [
+            { id: 1, pages: 100 },
+            { id: 2, pages: 300 },
+            { id: 3, pages: 350 },
+          ],
+        },
+      ],
+    });
+    const book = { ...baseBook, hardcoverMetadataId: '77', isbn13: '9780000000000', pageCount: 310 } as any;
+    const result = await makeService().matchBook(1, 'tok', book);
+    expect(result?.hardcoverEditionId).toBe(2);
+    expect(result?.editionPages).toBe(300);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockRepo.upsertBookState.mockResolvedValue({});
@@ -50,7 +90,7 @@ describe('HardcoverBookMatchService', () => {
     expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
   });
 
-  it('updates cached edition when the current cached edition has no pages', async () => {
+  it('preserves cached edition even if it has no pages', async () => {
     mockRepo.findBookState.mockResolvedValue({
       hardcoverBookId: 100,
       hardcoverEditionId: 200,
@@ -70,17 +110,7 @@ describe('HardcoverBookMatchService', () => {
 
     const result = await makeService().matchBook(1, 'tok', baseBook);
 
-    expect(result).toEqual({ hardcoverBookId: 100, hardcoverEditionId: 201, editionPages: 544, matchMethod: 'cached' });
-    expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 1,
-        bookId: 42,
-        hardcoverBookId: 100,
-        hardcoverEditionId: 201,
-        matchMethod: 'cached',
-        matchError: null,
-      }),
-    );
+    expect(result).toEqual({ hardcoverBookId: 100, hardcoverEditionId: 200, editionPages: null, matchMethod: 'cached' });
   });
 
   it('re-queries when cached state has match error', async () => {

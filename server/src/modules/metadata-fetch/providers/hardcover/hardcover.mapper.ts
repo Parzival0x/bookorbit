@@ -1,6 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
+import { MetadataSearchParams } from '../metadata-search-params';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
   if (releaseYear != null) {
@@ -55,6 +56,7 @@ export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCa
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
   const editionAuthors = extractAuthorsFromContributors(edition.cached_contributors);
   const authors = editionAuthors.length > 0 ? editionAuthors : extractAuthorsFromContributors(book.cached_contributors);
+  const isAudiobook = edition.format?.format?.toLowerCase().includes('audio');
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
@@ -65,7 +67,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     authors,
     publisher: edition.publisher?.name,
     language: edition.language?.code2,
-    pageCount: edition.pages ?? book.pages,
+    pageCount: isAudiobook ? edition.pages : (edition.pages ?? book.pages),
     publishedYear: parseYear(edition.release_year ?? book.release_year, edition.release_date ?? book.release_date),
     isbn10: edition.isbn_10,
     isbn13: edition.isbn_13,
@@ -74,4 +76,46 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     coverUrl: edition.image?.url ?? book.image?.url,
     sourceUrl: `https://hardcover.app/books/${book.slug}`,
   };
+}
+
+export function mapBestEditionForBook(book: HardcoverBookWithEditions, params: MetadataSearchParams): MetadataCandidate | null {
+  if (!book.editions || book.editions.length === 0) return null;
+
+  const targetAudio = params.isAudiobook ?? false;
+  const targetPages = params.pageCount;
+
+  const sorted = [...book.editions].sort((a, b) => {
+    const aAudio = a.format?.format?.toLowerCase().includes('audio') ?? false;
+    const bAudio = b.format?.format?.toLowerCase().includes('audio') ?? false;
+
+    // 1. Format match
+    const aFormatMatch = aAudio === targetAudio;
+    const bFormatMatch = bAudio === targetAudio;
+    if (aFormatMatch !== bFormatMatch) return aFormatMatch ? -1 : 1;
+
+    // 2. Page count closeness
+    if (targetPages) {
+      const aPages = a.pages ?? (aAudio ? undefined : book.pages);
+      const bPages = b.pages ?? (bAudio ? undefined : book.pages);
+      
+      if (aPages !== undefined && bPages !== undefined) {
+        const aDiff = Math.abs(aPages - targetPages);
+        const bDiff = Math.abs(bPages - targetPages);
+        if (aDiff !== bDiff) return aDiff - bDiff;
+      } else if (aPages !== undefined) {
+        return -1;
+      } else if (bPages !== undefined) {
+        return 1;
+      }
+    }
+
+    // 3. Has ISBN
+    const aHasIsbn = !!(a.isbn_13 || a.isbn_10);
+    const bHasIsbn = !!(b.isbn_13 || b.isbn_10);
+    if (aHasIsbn !== bHasIsbn) return aHasIsbn ? -1 : 1;
+
+    return 0;
+  });
+
+  return mapEdition(sorted[0], book);
 }

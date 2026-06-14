@@ -52,9 +52,11 @@ const FIND_BOOKS_BY_IDS_QUERY = `
 query FindBooksByIds($ids: [Int!]!) {
   books(where: { id: { _in: $ids } }, limit: 5) {
     id
-    editions(limit: 1) {
+    editions(limit: 50) {
       id
       pages
+      isbn_10
+      isbn_13
     }
   }
 }`;
@@ -63,9 +65,11 @@ const FIND_BOOK_BY_HARDCOVER_ID_QUERY = `
 query FindBookById($id: Int!) {
   books(where: { id: { _eq: $id } }, limit: 1) {
     id
-    editions(limit: 1) {
+    editions(limit: 50) {
       id
       pages
+      isbn_10
+      isbn_13
     }
   }
 }`;
@@ -74,9 +78,11 @@ const FIND_BOOK_BY_HARDCOVER_SLUG_QUERY = `
 query FindBookBySlug($slug: String!) {
   books(where: { slug: { _eq: $slug } }, limit: 1) {
     id
-    editions(limit: 1) {
+    editions(limit: 50) {
       id
       pages
+      isbn_10
+      isbn_13
     }
   }
 }`;
@@ -88,6 +94,8 @@ query FindBookEditionsById($id: Int!) {
     editions(limit: 50) {
       id
       pages
+      isbn_10
+      isbn_13
     }
   }
 }`;
@@ -95,7 +103,7 @@ query FindBookEditionsById($id: Int!) {
 interface BooksQueryResult {
   books: Array<{
     id: number;
-    editions?: Array<{ id: number; pages?: number | null }>;
+    editions?: Array<{ id: number; pages?: number | null; isbn_10?: string | null; isbn_13?: string | null }>;
   }>;
 }
 
@@ -143,9 +151,9 @@ export class HardcoverBookMatchService {
     if (book.hardcoverMetadataId) {
       const id = parseInt(book.hardcoverMetadataId, 10);
       if (!isNaN(id)) {
-        match = await this.matchByHardcoverId(userId, token, id, book.bookId);
+        match = await this.matchByHardcoverId(userId, token, id, book);
       } else {
-        match = await this.matchByHardcoverSlug(userId, token, book.hardcoverMetadataId, book.bookId);
+        match = await this.matchByHardcoverSlug(userId, token, book.hardcoverMetadataId, book);
       }
     }
 
@@ -158,7 +166,7 @@ export class HardcoverBookMatchService {
     }
 
     if (!match && book.title && book.authorName) {
-      match = await this.matchByTitleAuthor(userId, token, book.title, book.authorName, book.bookId);
+      match = await this.matchByTitleAuthor(userId, token, book.title, book.authorName, book);
     }
 
     if (match) {
@@ -182,41 +190,43 @@ export class HardcoverBookMatchService {
     return match;
   }
 
-  private async matchByHardcoverId(userId: number, token: string, id: number, bookId: number): Promise<HardcoverBookMatch | null> {
+  private async matchByHardcoverId(userId: number, token: string, id: number, bookSync: BookSyncData): Promise<HardcoverBookMatch | null> {
     try {
       const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_BY_HARDCOVER_ID_QUERY, { id });
       const book = data.books?.[0];
       if (!book) return null;
+      const bestEdition = this.findBestEdition(book.editions ?? [], bookSync);
       return {
         hardcoverBookId: book.id,
-        hardcoverEditionId: book.editions?.[0]?.id ?? null,
-        editionPages: book.editions?.[0]?.pages ?? null,
+        hardcoverEditionId: bestEdition.hardcoverEditionId,
+        editionPages: bestEdition.editionPages,
         matchMethod: 'metadata_id',
       };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[hardcover.book_match] [fail] userId=${userId} bookId=${bookId} method=metadata_id error="${error}" - metadata_id lookup failed`,
+        `[hardcover.book_match] [fail] userId=${userId} bookId=${bookSync.bookId} method=metadata_id error="${error}" - metadata_id lookup failed`,
       );
       return null;
     }
   }
 
-  private async matchByHardcoverSlug(userId: number, token: string, slug: string, bookId: number): Promise<HardcoverBookMatch | null> {
+  private async matchByHardcoverSlug(userId: number, token: string, slug: string, bookSync: BookSyncData): Promise<HardcoverBookMatch | null> {
     try {
       const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_BY_HARDCOVER_SLUG_QUERY, { slug });
       const book = data.books?.[0];
       if (!book) return null;
+      const bestEdition = this.findBestEdition(book.editions ?? [], bookSync);
       return {
         hardcoverBookId: book.id,
-        hardcoverEditionId: book.editions?.[0]?.id ?? null,
-        editionPages: book.editions?.[0]?.pages ?? null,
+        hardcoverEditionId: bestEdition.hardcoverEditionId,
+        editionPages: bestEdition.editionPages,
         matchMethod: 'metadata_id',
       };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[hardcover.book_match] [fail] userId=${userId} bookId=${bookId} method=metadata_slug error="${error}" - metadata_slug lookup failed`,
+        `[hardcover.book_match] [fail] userId=${userId} bookId=${bookSync.bookId} method=metadata_slug error="${error}" - metadata_slug lookup failed`,
       );
       return null;
     }
@@ -241,7 +251,7 @@ export class HardcoverBookMatchService {
     }
   }
 
-  private async matchByTitleAuthor(userId: number, token: string, title: string, author: string, bookId: number): Promise<HardcoverBookMatch | null> {
+  private async matchByTitleAuthor(userId: number, token: string, title: string, author: string, bookSync: BookSyncData): Promise<HardcoverBookMatch | null> {
     try {
       const searchData = await this.client.query<SearchBooksResult>(userId, token, SEARCH_BOOKS_QUERY, {
         query: `${title} ${author}`,
@@ -253,15 +263,16 @@ export class HardcoverBookMatchService {
       const booksById = new Map((data.books ?? []).map((book) => [book.id, book]));
       const book = ids.map((id) => booksById.get(id)).find((candidate): candidate is BooksQueryResult['books'][number] => candidate != null);
       if (!book) return null;
+      const bestEdition = this.findBestEdition(book.editions ?? [], bookSync);
       return {
         hardcoverBookId: book.id,
-        hardcoverEditionId: book.editions?.[0]?.id ?? null,
-        editionPages: book.editions?.[0]?.pages ?? null,
+        hardcoverEditionId: bestEdition.hardcoverEditionId,
+        editionPages: bestEdition.editionPages,
         matchMethod: 'title',
       };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      this.logger.warn(`[hardcover.book_match] [fail] userId=${userId} bookId=${bookId} method=title_author error="${error}" - title lookup failed`);
+      this.logger.warn(`[hardcover.book_match] [fail] userId=${userId} bookId=${bookSync.bookId} method=title_author error="${error}" - title lookup failed`);
       return null;
     }
   }
@@ -285,19 +296,8 @@ export class HardcoverBookMatchService {
       const editions = hardcoverBook.editions ?? [];
       const cachedEdition = cachedEditionId != null ? editions.find((edition) => edition.id === cachedEditionId) : undefined;
       const cachedEditionPages = this.normalizeEditionPages(cachedEdition?.pages);
-      if (cachedEditionPages != null) {
-        return { hardcoverEditionId: cachedEditionId, editionPages: cachedEditionPages };
-      }
-
-      const fallbackEdition = editions.find((edition) => this.normalizeEditionPages(edition.pages) != null);
-      if (!fallbackEdition) {
-        return { hardcoverEditionId: cachedEditionId, editionPages: null };
-      }
-
-      return {
-        hardcoverEditionId: fallbackEdition.id,
-        editionPages: this.normalizeEditionPages(fallbackEdition.pages),
-      };
+      
+      return { hardcoverEditionId: cachedEditionId, editionPages: cachedEditionPages };
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
@@ -305,6 +305,47 @@ export class HardcoverBookMatchService {
       );
       return { hardcoverEditionId: cachedEditionId, editionPages: null };
     }
+  }
+
+  private findBestEdition(
+    editions: NonNullable<BooksQueryResult['books'][0]['editions']>,
+    book: BookSyncData,
+  ): { hardcoverEditionId: number | null; editionPages: number | null } {
+    if (!editions || editions.length === 0) return { hardcoverEditionId: null, editionPages: null };
+
+    if (book.isbn13) {
+      const match = editions.find((e) => e.isbn_13 === book.isbn13);
+      if (match) return { hardcoverEditionId: match.id, editionPages: this.normalizeEditionPages(match.pages) };
+    }
+
+    if (book.isbn10) {
+      const match = editions.find((e) => e.isbn_10 === book.isbn10);
+      if (match) return { hardcoverEditionId: match.id, editionPages: this.normalizeEditionPages(match.pages) };
+    }
+
+    if (book.pageCount != null && book.pageCount > 0) {
+      const editionsWithPages = editions.filter((e) => this.normalizeEditionPages(e.pages) != null);
+      if (editionsWithPages.length > 0) {
+        let bestEdition = editionsWithPages[0]!;
+        let minDiff = Math.abs(this.normalizeEditionPages(bestEdition.pages)! - book.pageCount);
+        for (let i = 1; i < editionsWithPages.length; i++) {
+          const e = editionsWithPages[i]!;
+          const diff = Math.abs(this.normalizeEditionPages(e.pages)! - book.pageCount);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestEdition = e;
+          }
+        }
+        return { hardcoverEditionId: bestEdition.id, editionPages: this.normalizeEditionPages(bestEdition.pages) };
+      }
+    }
+
+    const fallbackEdition = editions.find((e) => this.normalizeEditionPages(e.pages) != null);
+    if (fallbackEdition) {
+      return { hardcoverEditionId: fallbackEdition.id, editionPages: this.normalizeEditionPages(fallbackEdition.pages) };
+    }
+
+    return { hardcoverEditionId: editions[0]!.id, editionPages: null };
   }
 
   private normalizeEditionPages(pages: number | null | undefined): number | null {

@@ -78,6 +78,10 @@ export interface HardcoverEdition {
   isbn_10?: string;
   isbn_13?: string;
   language?: { code2: string };
+  format?: {
+    id?: number;
+    format?: string;
+  };
 }
 
 export interface HardcoverCachedContributor {

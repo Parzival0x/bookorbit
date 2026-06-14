@@ -38,6 +38,7 @@ const EDITION_FIELDS = `
   isbn_10
   isbn_13
   language { code2 }
+  format { id format }
 `;
 
 const SEARCH_BY_ISBN_QUERY = `
@@ -63,7 +64,7 @@ const LOOKUP_BY_SLUG_QUERY = `
   query BookBySlug($slug: String!) {
     books(where: { slug: { _eq: $slug } }) {
       ${BOOK_FIELDS}
-      editions(limit: 1) {
+      editions(limit: 50) {
         ${EDITION_FIELDS}
       }
     }

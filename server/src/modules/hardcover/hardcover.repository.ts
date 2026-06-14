@@ -21,6 +21,7 @@ export interface BookSyncData {
   finishedAt: Date | null;
   rating: number | null;
   progress: number | null;
+  pageCount: number | null;
 }
 
 @Injectable()
@@ -154,6 +155,7 @@ export class HardcoverRepository {
         finishedAt: schema.userBookStatus.finishedAt,
         rating: schema.userBookRatings.rating,
         progress: maxProgressSq.maxProgress,
+        pageCount: schema.bookMetadata.pageCount,
       })
       .from(schema.books)
       .innerJoin(

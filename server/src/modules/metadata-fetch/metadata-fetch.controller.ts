@@ -68,6 +68,7 @@ export class MetadataFetchController {
       isbn: dto.isbn,
       existingProviderIds,
       isAudiobook,
+      pageCount: dto.pageCount,
     };
 
     const [preferences, providerKeys] = await Promise.all([this.metadataPreferences.getGlobal(), this.resolveEnabledProviderKeys(dto.providers)]);
@@ -84,7 +85,10 @@ export class MetadataFetchController {
     if (!enabledProvider) return null;
 
     const [candidate, preferences] = await Promise.all([
-      this.metadataFetchService.lookupById(enabledProvider, dto.id),
+      this.metadataFetchService.lookupById(enabledProvider, dto.id, {
+        isAudiobook: dto.isAudiobook,
+        pageCount: dto.pageCount,
+      }),
       this.metadataPreferences.getGlobal(),
     ]);
     if (!candidate) return null;

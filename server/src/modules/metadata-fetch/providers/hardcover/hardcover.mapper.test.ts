@@ -1,6 +1,6 @@
 import { MetadataProviderKey } from '@bookorbit/types';
 
-import { mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
+import { mapBestEditionForBook, mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
 import { HardcoverBookWithEditions, HardcoverSearchDocument } from './hardcover.types';
 
 const baseDocument: HardcoverSearchDocument = {
@@ -265,5 +265,74 @@ describe('mapBookWithEditions', () => {
       ],
     };
     expect(mapBookWithEditions(book)[0].authors).toEqual(['Valid Author']);
+  });
+});
+
+describe('mapBestEditionForBook', () => {
+  const multiEditionBook: HardcoverBookWithEditions = {
+    ...baseBook,
+    editions: [
+      {
+        ...baseBook.editions![0],
+        id: 1,
+        isbn_13: '111',
+        pages: 300,
+        format: { format: 'Paperback' },
+      },
+      {
+        ...baseBook.editions![0],
+        id: 2,
+        isbn_13: '222',
+        pages: 500,
+        format: { format: 'Audiobook' },
+      },
+      {
+        ...baseBook.editions![0],
+        id: 3,
+        isbn_13: '333',
+        pages: 400,
+        format: { format: 'Hardcover' },
+      },
+    ],
+  };
+
+  it('returns null if no editions', () => {
+    expect(mapBestEditionForBook({ ...baseBook, editions: [] }, {})).toBeNull();
+  });
+
+  it('prefers audiobook format when isAudiobook is true', () => {
+    const result = mapBestEditionForBook(multiEditionBook, { isAudiobook: true });
+    expect(result?.isbn13).toBe('222');
+  });
+
+  it('prefers physical format when isAudiobook is false', () => {
+    const result = mapBestEditionForBook(multiEditionBook, { isAudiobook: false });
+    // It should pick a physical book. Between 111 and 333, they tie on format, 
+    // tie on pageCount (since target is undefined), tie on ISBN, so it picks 111.
+    expect(['111', '333']).toContain(result?.isbn13);
+  });
+
+  it('prefers closest page count', () => {
+    const result = mapBestEditionForBook(multiEditionBook, { pageCount: 390 });
+    expect(result?.isbn13).toBe('333');
+    expect(result?.pageCount).toBe(400);
+  });
+  
+  it('prevents audiobook from inheriting book pages', () => {
+    const bookWithAudio: HardcoverBookWithEditions = {
+      ...baseBook,
+      pages: 1243, // Parent book has 1243 pages
+      editions: [
+        {
+          ...baseBook.editions![0],
+          pages: undefined, // Audiobook edition has no pages
+          format: { format: 'Audiobook' },
+        }
+      ]
+    };
+    
+    // Test that the fallback prevents inheriting 1243
+    const result = mapBestEditionForBook(bookWithAudio, {});
+    expect(result?.pageCount).toBeUndefined();
   });
 });

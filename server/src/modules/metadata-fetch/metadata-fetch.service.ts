@@ -38,10 +38,10 @@ export class MetadataFetchService {
     );
   }
 
-  async lookupById(key: MetadataProviderKey, providerId: string): Promise<MetadataCandidate | null> {
-    const provider = this.registry.find(key);
+  async lookupById(providerKey: MetadataProviderKey, id: string, params?: MetadataSearchParams): Promise<MetadataCandidate | null> {
+    const provider = this.registry.get(providerKey);
     if (!provider || !isIdentifiable(provider)) return null;
-    return provider.lookupById(providerId);
+    return provider.lookupById(id, undefined, params);
   }
 
   async getStoredProviderIds(bookId: number, user: RequestUser): Promise<Partial<Record<MetadataProviderKey, string>>> {
@@ -115,7 +115,7 @@ export class MetadataFetchService {
   private async fetchFromProvider(provider: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const existingProviderId = params.existingProviderIds?.[provider.key];
     if (isIdentifiable(provider) && existingProviderId) {
-      const lookupResult = await provider.lookupById(existingProviderId, params.signal);
+      const lookupResult = await provider.lookupById(existingProviderId, params.signal, params);
       if (lookupResult) {
         const rankedLookup = filterAndRank([lookupResult], params, 1);
         if (rankedLookup.length > 0) return rankedLookup;
