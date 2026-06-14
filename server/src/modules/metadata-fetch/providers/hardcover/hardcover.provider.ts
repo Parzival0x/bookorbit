@@ -52,7 +52,8 @@ export class HardcoverProvider implements IdentifiableProvider {
     const signal = params.signal;
 
     if (params.isbn) {
-      const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
+      const cleanIsbn = params.isbn.replace(/[^0-9X]/gi, '');
+      const books = signal ? await this.client.searchByIsbn(cleanIsbn, apiKey, signal) : await this.client.searchByIsbn(cleanIsbn, apiKey);
       if (books.length > 0) {
         const bestMatches = books
           .map((book) => mapBestEditionForBook(book, params))

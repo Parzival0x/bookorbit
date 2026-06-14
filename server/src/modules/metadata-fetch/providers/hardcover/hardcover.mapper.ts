@@ -56,7 +56,7 @@ export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCa
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
   const editionAuthors = extractAuthorsFromContributors(edition.cached_contributors);
   const authors = editionAuthors.length > 0 ? editionAuthors : extractAuthorsFromContributors(book.cached_contributors);
-  const isAudiobook = edition.format?.format?.toLowerCase().includes('audio');
+  const isAudiobook = edition.edition_format?.toLowerCase().includes('audio');
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
@@ -83,11 +83,20 @@ export function mapBestEditionForBook(book: HardcoverBookWithEditions, params: M
 
   const targetAudio = params.isAudiobook ?? false;
   const targetPages = params.pageCount;
+  const targetIsbn = params.isbn?.replace(/[^0-9X]/gi, ''); // Normalize ISBN for comparison
 
   const sorted = [...book.editions].sort((a, b) => {
-    const aAudio = a.format?.format?.toLowerCase().includes('audio') ?? false;
-    const bAudio = b.format?.format?.toLowerCase().includes('audio') ?? false;
+    // 0. Exact ISBN match (Strongest signal)
+    if (targetIsbn) {
+      const aIsbnMatch = (a.isbn_13?.replace(/[^0-9X]/gi, '') === targetIsbn) || (a.isbn_10?.replace(/[^0-9X]/gi, '') === targetIsbn);
+      const bIsbnMatch = (b.isbn_13?.replace(/[^0-9X]/gi, '') === targetIsbn) || (b.isbn_10?.replace(/[^0-9X]/gi, '') === targetIsbn);
+      if (aIsbnMatch !== bIsbnMatch) return aIsbnMatch ? -1 : 1;
+    }
 
+    const aAudio = a.edition_format?.toLowerCase().includes('audio') ?? false;
+    const bAudio = b.edition_format?.toLowerCase().includes('audio') ?? false;
+
+    // 1. Format match
     // 1. Format match
     const aFormatMatch = aAudio === targetAudio;
     const bFormatMatch = bAudio === targetAudio;
