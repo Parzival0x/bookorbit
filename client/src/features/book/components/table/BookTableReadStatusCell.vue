@@ -21,10 +21,19 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const saving = ref(false)
 
-const currentStatus = computed<ReadStatus>(() => props.value?.status ?? 'unread')
-const CurrentIcon = computed(() => STATUS_ICONS[currentStatus.value] as unknown)
-const currentColor = computed(() => STATUS_COLORS[currentStatus.value])
-const currentLabel = computed(() => STATUS_OPTIONS.find((o) => o.value === currentStatus.value)?.label ?? 'Unread')
+// ⚡ Bolt: Performance Optimization
+// Consolidating 4 individual computed properties into a single `displayData` object.
+// Impact: Reduces Vue reactive watchers per table cell instance from 4 to 1,
+// significantly decreasing initialization overhead during rapid scrolling in virtualized lists.
+const displayData = computed(() => {
+  const status = props.value?.status ?? 'unread'
+  return {
+    status,
+    icon: STATUS_ICONS[status] as unknown,
+    color: STATUS_COLORS[status],
+    label: STATUS_OPTIONS.find((o) => o.value === status)?.label ?? 'Unread',
+  }
+})
 
 watch(
   () => props.isActive,
@@ -64,10 +73,10 @@ function handleTab(e: KeyboardEvent) {
         <button
           type="button"
           class="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-xs transition-colors"
-          :class="[currentColor, isReadOnly ? 'cursor-default' : 'hover:bg-primary/5 cursor-pointer']"
+          :class="[displayData.color, isReadOnly ? 'cursor-default' : 'hover:bg-primary/5 cursor-pointer']"
         >
-          <component :is="CurrentIcon" :size="12" />
-          <span class="truncate">{{ currentLabel }}</span>
+          <component :is="displayData.icon" :size="12" />
+          <span class="truncate">{{ displayData.label }}</span>
           <ChevronDown v-if="!isReadOnly" :size="10" class="ml-auto shrink-0 text-muted-foreground/50" />
         </button>
       </DropdownMenuTrigger>
@@ -76,7 +85,7 @@ function handleTab(e: KeyboardEvent) {
           v-for="opt in STATUS_OPTIONS"
           :key="opt.value"
           class="gap-2 text-xs"
-          :class="opt.value === currentStatus ? 'text-primary font-medium' : ''"
+          :class="opt.value === displayData.status ? 'text-primary font-medium' : ''"
           @select="selectOption(opt.value)"
         >
           <component :is="STATUS_ICONS[opt.value]" :size="12" :class="STATUS_COLORS[opt.value]" />
