@@ -74,7 +74,7 @@ function isValidIsbn10(digits: string): boolean {
 }
 
 function extractIsbnFromText(text: string): { isbn10: string | null; isbn13: string | null } | null {
-  const isbnRegex = /ISBN(?:-1[03])?[\s:]*([0-9X\-\s]{10,17})/gi;
+  const isbnRegex = /ISBN(?:-1[03])?[^\d<>\n]{0,20}([0-9X\-\s]{10,17})/gi;
   let match;
   while ((match = isbnRegex.exec(text)) !== null) {
     const digits = match[1].replace(/[^\dX]/gi, '');
