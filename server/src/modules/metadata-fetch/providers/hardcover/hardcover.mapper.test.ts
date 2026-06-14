@@ -307,7 +307,7 @@ describe('mapBestEditionForBook', () => {
 
   it('prefers physical format when isAudiobook is false', () => {
     const result = mapBestEditionForBook(multiEditionBook, { isAudiobook: false });
-    // It should pick a physical book. Between 111 and 333, they tie on format, 
+    // It should pick a physical book. Between 111 and 333, they tie on format,
     // tie on pageCount (since target is undefined), tie on ISBN, so it picks 111.
     expect(['111', '333']).toContain(result?.isbn13);
   });
@@ -317,7 +317,7 @@ describe('mapBestEditionForBook', () => {
     expect(result?.isbn13).toBe('333');
     expect(result?.pageCount).toBe(400);
   });
-  
+
   it('prevents audiobook from inheriting book pages', () => {
     const bookWithAudio: HardcoverBookWithEditions = {
       ...baseBook,
@@ -327,10 +327,10 @@ describe('mapBestEditionForBook', () => {
           ...baseBook.editions![0],
           pages: undefined, // Audiobook edition has no pages
           format: { format: 'Audiobook' },
-        }
-      ]
+        },
+      ],
     };
-    
+
     // Test that the fallback prevents inheriting 1243
     const result = mapBestEditionForBook(bookWithAudio, {});
     expect(result?.pageCount).toBeUndefined();

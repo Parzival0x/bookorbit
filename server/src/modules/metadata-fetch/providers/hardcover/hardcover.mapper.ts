@@ -97,7 +97,7 @@ export function mapBestEditionForBook(book: HardcoverBookWithEditions, params: M
     if (targetPages) {
       const aPages = a.pages ?? (aAudio ? undefined : book.pages);
       const bPages = b.pages ?? (bAudio ? undefined : book.pages);
-      
+
       if (aPages !== undefined && bPages !== undefined) {
         const aDiff = Math.abs(aPages - targetPages);
         const bDiff = Math.abs(bPages - targetPages);

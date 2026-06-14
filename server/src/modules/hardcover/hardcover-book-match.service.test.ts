@@ -30,7 +30,6 @@ const baseBook = {
 };
 
 describe('HardcoverBookMatchService', () => {
-
   it('selects edition by exact isbn13 match', async () => {
     mockRepo.findBookState.mockResolvedValue(undefined);
     mockClient.query.mockResolvedValue({
