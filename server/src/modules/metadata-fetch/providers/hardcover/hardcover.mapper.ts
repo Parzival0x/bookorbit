@@ -2,6 +2,7 @@ import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { normalizeIsbn } from '../../../../common/utils/isbn-normalize.utils';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
   if (releaseYear != null) {
@@ -56,7 +57,7 @@ export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCa
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
   const editionAuthors = extractAuthorsFromContributors(edition.cached_contributors);
   const authors = editionAuthors.length > 0 ? editionAuthors : extractAuthorsFromContributors(book.cached_contributors);
-  const isAudiobook = edition.format?.format?.toLowerCase().includes('audio');
+  const isAudiobook = edition.edition_format?.toLowerCase().includes('audio');
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
@@ -83,10 +84,18 @@ export function mapBestEditionForBook(book: HardcoverBookWithEditions, params: M
 
   const targetAudio = params.isAudiobook ?? false;
   const targetPages = params.pageCount;
+  const targetIsbn = params.isbn ? normalizeIsbn(params.isbn) : undefined;
 
   const sorted = [...book.editions].sort((a, b) => {
-    const aAudio = a.format?.format?.toLowerCase().includes('audio') ?? false;
-    const bAudio = b.format?.format?.toLowerCase().includes('audio') ?? false;
+    // 0. Exact ISBN match (Strongest signal)
+    if (targetIsbn) {
+      const aIsbnMatch = (a.isbn_13 ? normalizeIsbn(a.isbn_13) === targetIsbn : false) || (a.isbn_10 ? normalizeIsbn(a.isbn_10) === targetIsbn : false);
+      const bIsbnMatch = (b.isbn_13 ? normalizeIsbn(b.isbn_13) === targetIsbn : false) || (b.isbn_10 ? normalizeIsbn(b.isbn_10) === targetIsbn : false);
+      if (aIsbnMatch !== bIsbnMatch) return aIsbnMatch ? -1 : 1;
+    }
+
+    const aAudio = a.edition_format?.toLowerCase().includes('audio') ?? false;
+    const bAudio = b.edition_format?.toLowerCase().includes('audio') ?? false;
 
     // 1. Format match
     const aFormatMatch = aAudio === targetAudio;

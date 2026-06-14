@@ -277,21 +277,21 @@ describe('mapBestEditionForBook', () => {
         id: 1,
         isbn_13: '111',
         pages: 300,
-        format: { format: 'Paperback' },
+        edition_format: 'Paperback',
       },
       {
         ...baseBook.editions![0],
         id: 2,
         isbn_13: '222',
         pages: 500,
-        format: { format: 'Audiobook' },
+        edition_format: 'Audiobook',
       },
       {
         ...baseBook.editions![0],
         id: 3,
         isbn_13: '333',
         pages: 400,
-        format: { format: 'Hardcover' },
+        edition_format: 'Hardcover',
       },
     ],
   };
@@ -326,7 +326,7 @@ describe('mapBestEditionForBook', () => {
         {
           ...baseBook.editions![0],
           pages: undefined, // Audiobook edition has no pages
-          format: { format: 'Audiobook' },
+          edition_format: 'Audiobook',
         },
       ],
     };

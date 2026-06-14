@@ -38,7 +38,7 @@ const EDITION_FIELDS = `
   isbn_10
   isbn_13
   language { code2 }
-  format { id format }
+  edition_format
 `;
 
 const SEARCH_BY_ISBN_QUERY = `

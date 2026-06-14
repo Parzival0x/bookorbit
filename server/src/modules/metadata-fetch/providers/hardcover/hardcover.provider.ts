@@ -7,6 +7,7 @@ import { MetadataSearchParams } from '../metadata-search-params';
 import { HardcoverClient } from './hardcover.client';
 import { mapBestEditionForBook, mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
 import { HardcoverSearchDocument } from './hardcover.types';
+import { normalizeIsbn } from '../../../../common/utils/isbn-normalize.utils';
 
 @Injectable()
 export class HardcoverProvider implements IdentifiableProvider {
@@ -45,6 +46,8 @@ export class HardcoverProvider implements IdentifiableProvider {
 
     return docs.map((doc) => {
       const candidate = mapSearchDocument(doc);
+      // ISBNs from search documents are aggregated across all editions and may not
+      // correspond to the user's specific edition. Remove them to avoid mismatches.
       delete candidate.isbn10;
       delete candidate.isbn13;
       return candidate;
@@ -57,7 +60,8 @@ export class HardcoverProvider implements IdentifiableProvider {
     const signal = params.signal;
 
     if (params.isbn) {
-      const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
+      const cleanIsbn = normalizeIsbn(params.isbn);
+      const books = signal ? await this.client.searchByIsbn(cleanIsbn, apiKey, signal) : await this.client.searchByIsbn(cleanIsbn, apiKey);
       if (books.length > 0) {
         const bestMatches = books
           .map((book) => mapBestEditionForBook(book, params))
