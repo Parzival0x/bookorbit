@@ -46,6 +46,9 @@ describe('extractEpubMetadata', () => {
       seriesIndex: null,
       authors: [],
       tags: [],
+      spine: [],
+      manifest: {},
+      guide: {},
     });
 
     await expect(extractEpubMetadata('/books/dune.epub')).resolves.toEqual(expect.objectContaining({ title: 'Dune' }));
@@ -71,6 +74,9 @@ describe('extractEpubMetadata', () => {
       seriesIndex: null,
       authors: [],
       tags: [],
+      spine: [],
+      manifest: {},
+      guide: {},
     });
 
     await expect(extractEpubMetadata('/books/x.epub')).resolves.toEqual(expect.objectContaining({ title: 'Leading Slash' }));
