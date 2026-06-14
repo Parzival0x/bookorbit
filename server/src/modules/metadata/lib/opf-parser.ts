@@ -26,13 +26,16 @@ export interface ParsedOpf {
   lubimyczytacId: string | null;
   itunesId: string | null;
   coverHref: string | null;
+  spine: string[];
+  manifest: Record<string, string>;
+  guide: Record<string, string>;
 }
 
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   removeNSPrefix: true,
-  isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item', 'reference'].includes(name),
+  isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item', 'reference', 'itemref'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
   parseTagValue: false, // keep all values as strings — prevents leading-zero loss on ISBNs and numeric year conversion
@@ -387,48 +390,55 @@ export function parseOpf(xml: string): ParsedOpf {
   let coverHref: string | null = null;
 
   const guide = (pkg['guide'] ?? {}) as Record<string, unknown>;
+  const guideDict: Record<string, string> = {};
   for (const ref of toArray(guide['reference'])) {
     const ro = (typeof ref === 'object' && ref !== null ? ref : {}) as Record<string, unknown>;
     const type = ((ro['@_type'] as string | undefined) ?? '').toLowerCase().trim();
-    if (type === 'cover') {
-      const href = ((ro['@_href'] as string | undefined) ?? '').trim();
-      if (href) {
+    const href = ((ro['@_href'] as string | undefined) ?? '').trim();
+    if (type && href) {
+      guideDict[type] = href;
+      if (type === 'cover') {
         coverHref = href;
-        break;
       }
     }
   }
 
   const manifest = (pkg['manifest'] ?? {}) as Record<string, unknown>;
   const manifestItems = toArray(manifest['item']);
+  const manifestDict: Record<string, string> = {};
 
-  if (!coverHref) {
-    for (const item of manifestItems) {
-      const io = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+  for (const item of manifestItems) {
+    const io = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+    const id = (io['@_id'] as string | undefined) ?? '';
+    const href = ((io['@_href'] as string | undefined) ?? '').trim();
+    
+    if (id && href) {
+      manifestDict[id] = href;
+    }
+
+    if (!coverHref) {
       const props = ((io['@_properties'] as string | undefined) ?? '').split(/\s+/);
-      if (props.includes('cover-image')) {
-        const href = ((io['@_href'] as string | undefined) ?? '').trim();
-        if (href) {
-          coverHref = href;
-          break;
-        }
+      if (props.includes('cover-image') && href) {
+        coverHref = href;
       }
     }
   }
 
   if (!coverHref) {
     const coverItemId = namedMeta('cover');
-    if (coverItemId) {
-      for (const item of manifestItems) {
-        const io = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
-        if ((io['@_id'] as string | undefined) === coverItemId) {
-          const href = ((io['@_href'] as string | undefined) ?? '').trim();
-          if (href) {
-            coverHref = href;
-            break;
-          }
-        }
-      }
+    if (coverItemId && manifestDict[coverItemId]) {
+      coverHref = manifestDict[coverItemId];
+    }
+  }
+
+  const spine = (pkg['spine'] ?? {}) as Record<string, unknown>;
+  const spineItems = toArray(spine['itemref']);
+  const spineArray: string[] = [];
+  for (const item of spineItems) {
+    const io = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+    const idref = (io['@_idref'] as string | undefined) ?? '';
+    if (idref) {
+      spineArray.push(idref);
     }
   }
 
@@ -458,5 +468,8 @@ export function parseOpf(xml: string): ParsedOpf {
     lubimyczytacId,
     itunesId,
     coverHref,
+    spine: spineArray,
+    manifest: manifestDict,
+    guide: guideDict,
   };
 }
