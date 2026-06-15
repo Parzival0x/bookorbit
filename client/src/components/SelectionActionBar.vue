@@ -465,7 +465,7 @@ watch(
 
             <Tooltip>
               <TooltipTrigger as-child>
-                <button :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']" @click="emit('exit')">
+                <button :class="[BTN_ICON, 'text-muted-foreground hover:text-foreground hover:bg-muted']" @click="emit('exit')" aria-label="Exit selection">
                   <X :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
