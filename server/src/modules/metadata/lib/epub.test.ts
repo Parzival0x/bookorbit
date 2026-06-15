@@ -190,4 +190,98 @@ describe('extractEpubMetadata', () => {
     expect(result!.isbn13).toBeNull();
     expect(result!.isbn10).toBeNull();
   });
+
+  it('populates isbn10 from fallback scan when metadata has no ISBN', async () => {
+    const containerXml = `
+      <container>
+        <rootfiles>
+          <rootfile full-path="OPS/content.opf" />
+        </rootfiles>
+      </container>
+    `;
+
+    const copyrightHtml = `
+      <html><body>
+        <p>Copyright © 2024 by Author Name</p>
+        <p>ISBN: 0-441-01359-7</p>
+      </body></html>
+    `;
+
+    mockOpenFile.mockResolvedValue({
+      files: [
+        zipFile('META-INF/container.xml', containerXml),
+        zipFile('OPS/content.opf', '<package/>'),
+        zipFile('OPS/copyright.xhtml', copyrightHtml),
+      ],
+    });
+
+    mockParseOpf.mockReturnValue({
+      title: 'No ISBN Book',
+      subtitle: null,
+      description: null,
+      isbn10: null,
+      isbn13: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      tags: [],
+      spine: [],
+      manifest: { 'copyright-id': 'copyright.xhtml' },
+      guide: {},
+    });
+
+    const result = await extractEpubMetadata('/books/no-isbn.epub');
+    expect(result).not.toBeNull();
+    expect(result!.isbn13).toBeNull();
+    expect(result!.isbn10).toBe('0441013597');
+  });
+
+  it('populates isbn13 from fallback scan using guide-based file resolution', async () => {
+    const containerXml = `
+      <container>
+        <rootfiles>
+          <rootfile full-path="OPS/content.opf" />
+        </rootfiles>
+      </container>
+    `;
+
+    const oddNameHtml = `
+      <html><body>
+        <p>ISBN: 978-0-441-01359-3</p>
+      </body></html>
+    `;
+
+    mockOpenFile.mockResolvedValue({
+      files: [
+        zipFile('META-INF/container.xml', containerXml),
+        zipFile('OPS/content.opf', '<package/>'),
+        zipFile('OPS/chapter99.xhtml', oddNameHtml),
+      ],
+    });
+
+    mockParseOpf.mockReturnValue({
+      title: 'Guide Resolution Book',
+      subtitle: null,
+      description: null,
+      isbn10: null,
+      isbn13: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      tags: [],
+      spine: [],
+      manifest: { 'ch99-id': 'chapter99.xhtml' },
+      guide: { 'copyright': 'chapter99.xhtml' },
+    });
+
+    const result = await extractEpubMetadata('/books/guide-isbn.epub');
+    expect(result).not.toBeNull();
+    expect(result!.isbn13).toBe('9780441013593');
+  });
 });
