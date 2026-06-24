@@ -276,7 +276,7 @@ function formatBadgeStyle(fmt: string) {
           placeholder="Search all books..."
           class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
-        <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground">
+        <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
           <X :size="13" />
         </button>
 
@@ -378,6 +378,7 @@ function formatBadgeStyle(fmt: string) {
             v-if="globalSearchQuery"
             @click="clearSearch()"
             class="flex items-center justify-center text-muted-foreground/75 hover:text-foreground transition-colors"
+            aria-label="Clear search"
           >
             <X :size="13" />
           </button>
@@ -825,6 +826,7 @@ function formatBadgeStyle(fmt: string) {
                 'flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-primary/50 bg-primary/10 hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                 iconRadiusClass,
               ]"
+              aria-label="User menu"
             >
               <UserAvatar :name="user.name" :avatar-url="user.avatarUrl ?? null" size-class="h-full w-full" />
             </button>
